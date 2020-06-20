@@ -2,6 +2,7 @@ package com.tianjj.gldemo;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.opengl.GLES20;
 import android.opengl.GLUtils;
 import android.util.Log;
 
@@ -40,6 +41,8 @@ public class GLFrameBuffer {
         mWidth = width;
         mHeight = height;
 
+        bind();
+
         glBindTexture(GL_TEXTURE_2D, mTextureName);
         checkGlError();
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -47,29 +50,10 @@ public class GLFrameBuffer {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        //Bitmap bitmap = Bitmap.createBitmap(width * 2, height * 2, Bitmap.Config.ARGB_8888);
-        //GLUtils.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap, GL_UNSIGNED_BYTE, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mTextureName, 0);
 
-        int[] rb = new int[1];
-        glGenRenderbuffers(1, rb, 0);
-        checkGlError();
-        glBindRenderbuffer(GL_RENDERBUFFER, rb[0]);//绑定renderbuffer
-        checkGlError();
-        //设置renderbuffer的缓冲大小
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA4, width, height);
-        checkGlError();
-
-        bind();
-        int st = getStatus();
-        if (st == GL_FRAMEBUFFER_COMPLETE) {
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rb[0]);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mTextureName, 0);
-        } else {
-            Log.d("FB", "No completed status " + st);
-        }
-        st = getStatus();
         unbind();
-        st = getStatus();
     }
 
     private void checkGlError() {

@@ -131,7 +131,6 @@ public class BlurFilter {
         float stepX = radiusByPasses / (float) mCompositionFbo.getWidth();
         float stepY = radiusByPasses / (float) mCompositionFbo.getHeight();
 
-        int stat = mCompositionFbo.getStatus();
         useBlurProgram();
         checkGlError();
         glActiveTexture(GL_TEXTURE0);
@@ -169,11 +168,8 @@ public class BlurFilter {
         mLastDrawTarget = read;
     }
 
-    public void render() {
-        glBindTexture(GL_TEXTURE_2D, mLastDrawTarget.getTextureName());
-        checkGlError();
-        drawMesh(mBUvLoc, mBPosLoc);
-        checkGlError();
+    public int getRenderTexture() {
+        return mLastDrawTarget.getTextureName();
     }
 
     void drawMesh(int uv, int position) {

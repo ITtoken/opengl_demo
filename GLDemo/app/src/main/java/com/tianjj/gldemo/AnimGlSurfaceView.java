@@ -56,6 +56,8 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
 
     private boolean toLeft = true;
 
+    private BlurFilter mBlurFilter = null;
+
     public AnimGlSurfaceView(Context context) {
         super(context);
         init(context);
@@ -67,6 +69,8 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     }
 
     private void init(Context context) {
+        mBlurFilter = new BlurFilter(context);
+
         mGestureDetector = new GestureDetector(context, new MyGestureListener(this));
 
         setEGLContextClientVersion(2);
@@ -135,8 +139,10 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
         glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
 
+        mBlurFilter.init();
+
         if (mMesh == null) {
-            mMesh = createMesh(0, 1, 1, 0);
+            mMesh = createMesh(-1, 1, 1, -1);
         }
 
         if (-1 == mTex) {
@@ -149,22 +155,20 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
             mProgram = buildProgram(vertShader, fragShader);
         }
 
-
-        final int attribPosition = glGetAttribLocation(mProgram, "position");
-        final int attribTexCoords = glGetAttribLocation(mProgram, "texCoords");
-        final int uniformTexture = glGetUniformLocation(mProgram, "texture");
-        final int uniformProjection = glGetUniformLocation(mProgram, "projection");
-
         checkGlError();
 
         glBindTexture(GL_TEXTURE_2D, mTex);
 
         glUseProgram(mProgram);//绑定program到当前的opengl版本环境
+        final int attribPosition = glGetAttribLocation(mProgram, "position");
+        final int attribTexCoords = glGetAttribLocation(mProgram, "texCoords");
+        final int uniformTexture = glGetUniformLocation(mProgram, "texture");
+        final int uniformProjection = glGetUniformLocation(mProgram, "projection");
         glEnableVertexAttribArray(attribPosition);
         glEnableVertexAttribArray(attribTexCoords);
         glUniform1i(uniformTexture, 0);
 
-        if (toLeft) {
+       /* if (toLeft) {
             mX -= 0.05f;
             if (mX < -1) {
                 toLeft = false;
@@ -174,7 +178,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
             if (mX >= 0) {
                 toLeft = true;
             }
-        }
+        }*/
 
         Matrix.setRotateM(mMMatrix, 0, 0, 0, 1.0f, 0);
         Matrix.translateM(mMMatrix, 0, mX, -0.5f, 0);
@@ -190,7 +194,12 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         glVertexAttribPointer(attribTexCoords, 2, GL_FLOAT, false,
                 TRIANGLE_VERTICES_DATA_STRIDE_BYTES, mMesh);
 
+        mBlurFilter.setAsDrawTarget(10, getWidth(), getHeight());
+
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+        mBlurFilter.preprare();
+        mBlurFilter.render();
 
         glDisableVertexAttribArray(attribPosition);
         glDisableVertexAttribArray(attribTexCoords);

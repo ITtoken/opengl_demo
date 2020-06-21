@@ -55,12 +55,14 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     private int mProgram = -1;
 
     private boolean toLeft = true;
+    private boolean toBlur = true;
 
     private BlurFilter mBlurFilter = null;
     private int attribPosition;
     private int attribTexCoords;
     private int uniformTexture;
     private int uniformProjection;
+    private int mBlurRadius;
 
     public AnimGlSurfaceView(Context context) {
         super(context);
@@ -164,7 +166,19 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
 
         prepareMesh();
 
-        mBlurFilter.setAsDrawTarget( 10, getWidth(), getHeight());
+        if (toBlur) {
+            mBlurRadius += 5;
+            if (mBlurRadius >= 500) {
+                toBlur = false;
+            }
+        } else {
+            mBlurRadius -= 5;
+            if (mBlurRadius <= 5) {
+                toBlur = true;
+            }
+        }
+
+        mBlurFilter.setAsDrawTarget(mBlurRadius, getWidth(), getHeight());
 
         glBindTexture(GL_TEXTURE_2D, mTex);
         glDrawArrays(GL_TRIANGLE_STRIP ,0, 4);
@@ -194,17 +208,17 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         glEnableVertexAttribArray(attribTexCoords);
         glUniform1i(uniformTexture, 0);
 
-//        if (toLeft) {
-//            mX -= 0.05f;
-//            if (mX < -1) {
-//                toLeft = false;
-//            }
-//        } else {
-//            mX += 0.05f;
-//            if (mX >= 0) {
-//                toLeft = true;
-//            }
-//        }
+/*        if (toLeft) {
+            mX -= 0.05f;
+            if (mX < -1) {
+                toLeft = false;
+            }
+        } else {
+            mX += 0.05f;
+            if (mX >= 0) {
+                toLeft = true;
+            }
+        }*/
 
         Matrix.setRotateM(mMMatrix, 0, 0, 0, 1.0f, 0);
         Matrix.translateM(mMMatrix, 0, mX, 0, 0);

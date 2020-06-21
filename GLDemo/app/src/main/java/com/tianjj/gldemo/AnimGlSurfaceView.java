@@ -130,7 +130,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
                 ratio,
                 -1,
                 1,
-                2, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
+                1.5f, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
                 6);
     }
 
@@ -146,12 +146,12 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
             mBlurFilter.init();
         }
 
-        if (mMesh == null) {
-            mMesh = createMesh(-1, 1, 1, -1);
+        if (-1 == mTex) {
+            mTex = getImageTexture();//getTextTextureWith("Tianjj@tcl.com", 800f);
         }
 
-        if (-1 == mTex) {
-            mTex = getTextTextureWith("Tianjj@tcl.com", 800f);
+        if (mMesh == null) {
+            mMesh = createMesh(-1, 1, 1, -1);
         }
 
         if (-1 == mProgram) {
@@ -164,16 +164,9 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
 
         prepareMesh();
 
-        mBlurFilter.setAsDrawTarget( 200, getWidth(), getHeight());
-        glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        mBlurFilter.setAsDrawTarget( 10, getWidth(), getHeight());
 
         glBindTexture(GL_TEXTURE_2D, mTex);
-
-        int[] get = new int[1];
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, get, 0);
-
-        glGetIntegerv(GL_TEXTURE_BINDING_2D, get, 0);
         glDrawArrays(GL_TRIANGLE_STRIP ,0, 4);
         mBlurFilter.preprare();
 
@@ -182,9 +175,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         int renderTexture = mBlurFilter.getRenderTexture();
         glBindTexture(GL_TEXTURE_2D, renderTexture);
 
-        glGetIntegerv(GL_TEXTURE_BINDING_2D, get, 0);
-//
-        prepareMesh();
+        //prepareMesh();
         glDrawArrays(GL_TRIANGLE_STRIP,0, 4);
 
         glDisableVertexAttribArray(attribPosition);
@@ -203,20 +194,20 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         glEnableVertexAttribArray(attribTexCoords);
         glUniform1i(uniformTexture, 0);
 
-        /*if (toLeft) {
-            mX -= 0.05f;
-            if (mX < -1) {
-                toLeft = false;
-            }
-        } else {
-            mX += 0.05f;
-            if (mX >= 0) {
-                toLeft = true;
-            }
-        }*/
+//        if (toLeft) {
+//            mX -= 0.05f;
+//            if (mX < -1) {
+//                toLeft = false;
+//            }
+//        } else {
+//            mX += 0.05f;
+//            if (mX >= 0) {
+//                toLeft = true;
+//            }
+//        }
 
         Matrix.setRotateM(mMMatrix, 0, 0, 0, 1.0f, 0);
-        Matrix.translateM(mMMatrix, 0, mX, -0.5f, 0);
+        Matrix.translateM(mMMatrix, 0, mX, 0, 0);
         float[] finalMatrix = getFinalMatrix(mMMatrix);
 
         glUniformMatrix4fv(uniformProjection, 1, false, finalMatrix, 0);
@@ -292,6 +283,27 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         }
 
         return program;
+    }
+
+    private int getImageTexture() {
+        int[] textures = new int[1];
+
+        glActiveTexture(GL_TEXTURE0);
+        glGenTextures(1, textures, 0);
+        checkGlError();
+
+        int texture = textures[0];
+        glBindTexture(GL_TEXTURE_2D, texture);
+        checkGlError();
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.timg);
+        GLUtils.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap, GL_UNSIGNED_BYTE, 0);
+        return texture;
     }
 
     private int getTextTextureWith(String text, float size) {

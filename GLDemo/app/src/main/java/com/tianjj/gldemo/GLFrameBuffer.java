@@ -49,13 +49,7 @@ public class GLFrameBuffer {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
         checkGlError();
 
-//        int[] rb = new int[1];
-//        glGenRenderbuffers(1, rb, 0);
-//        glBindRenderbuffer(GL_RENDERBUFFER, rb[0]);
-//        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA4, width, height);
-
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mTextureName, 0);
-        //glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rb[0]);
 
         glBindTexture(GL_TEXTURE_2D, 0);
 

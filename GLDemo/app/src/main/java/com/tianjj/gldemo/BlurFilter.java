@@ -41,9 +41,9 @@ public class BlurFilter {
             initShader();
             initVBO();
 
+            mCompositionFbo = new GLFrameBuffer();
             mPingFbo = new GLFrameBuffer();
             mPongFbo = new GLFrameBuffer();
-            mCompositionFbo = new GLFrameBuffer();
             inited = true;
         }
     }
@@ -64,14 +64,18 @@ public class BlurFilter {
 
         int[] tmp = new int[1];
         glGenBuffers(1, tmp, 0);
+        checkGlError();
         mVbo = tmp[0];
 
-        final FloatBuffer triangleVertices = ByteBuffer.allocateDirect(vboData.length * 4).order(
+        FloatBuffer triangleVertices = ByteBuffer.allocateDirect(vboData.length * 4).order(
                 ByteOrder.nativeOrder()).asFloatBuffer();
         triangleVertices.put(vboData).position(0);
         glBindBuffer(GL_ARRAY_BUFFER, mVbo);
-        glBufferData(GL_ARRAY_BUFFER, vboData.length, triangleVertices, GL_STATIC_DRAW);
+        checkGlError();
+        glBufferData(GL_ARRAY_BUFFER, vboData.length*4, triangleVertices, GL_STATIC_DRAW);
+        checkGlError();
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+        checkGlError();
     }
 
     private void initShader() {
@@ -98,8 +102,8 @@ public class BlurFilter {
 
         mCompositionFbo.allocateBuffers(width, height);
 
-        int fboWidth = (int) (width * kFboScale);
-        int fboHeight = (int) (height * kFboScale);
+        int fboWidth = (int) (width /** kFboScale*/);
+        int fboHeight = (int) (height /** kFboScale*/);
         mPingFbo.allocateBuffers(fboWidth, fboHeight);
         mPongFbo.allocateBuffers(fboWidth, fboHeight);
 
@@ -116,20 +120,20 @@ public class BlurFilter {
             return;
         }
 
-        int stat1 = mCompositionFbo.getStatus();
         mCompositionFbo.bind();
-        int stat = mCompositionFbo.getStatus();
+        checkGlError();
         viewPort(0, 0, mCompositionFbo.getWidth(), mCompositionFbo.getHeight());
     }
 
     public void preprare() {
-        float radius = mRadius * 0.6f;
+        float radius = mRadius / 6.0f;
 
         int passes = Math.min(kMaxPasses, (int) Math.ceil(radius));
 
         float radiusByPasses = radius / (float) passes;
         float stepX = radiusByPasses / (float) mCompositionFbo.getWidth();
         float stepY = radiusByPasses / (float) mCompositionFbo.getHeight();
+
 
         useBlurProgram();
         checkGlError();
@@ -146,6 +150,11 @@ public class BlurFilter {
         checkGlError();
         drawMesh(mBUvLoc, mBPosLoc);
 
+        int[] get0 = new int[1];
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, get0, 0);
+
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, get0, 0);
+
         checkGlError();
 
         GLFrameBuffer read = mPingFbo;
@@ -156,6 +165,11 @@ public class BlurFilter {
 
             glBindTexture(GL_TEXTURE_2D, read.getTextureName());
             glUniform2f(mBOffsetLoc, stepX * i, stepY * i);
+
+            int[] get = new int[1];
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, get, 0);
+
+            glGetIntegerv(GL_TEXTURE_BINDING_2D, get, 0);
 
             drawMesh(mBUvLoc, mBPosLoc);
             checkGlError();
@@ -178,15 +192,15 @@ public class BlurFilter {
         glBindBuffer(GL_ARRAY_BUFFER, mVbo);
         checkGlError();
         glVertexAttribPointer(position, 2 /* size */, GL_FLOAT, false,
-                2 * 4 /* stride */, 0 /* offset */);
+                0 /* stride */, 0 /* offset */);
         checkGlError();
         glVertexAttribPointer(uv, 2 /* size */, GL_FLOAT, false, 0 /* stride */,
-                6 * 4 /* offset */);
+                6*4 /* offset */);
         checkGlError();
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         // draw mesh
-        glDrawArrays(GL_TRIANGLES, 0 /* first */, 3 /* count */);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0 /* first */, 3 /* count */);
     }
 
     private void checkGlError() {

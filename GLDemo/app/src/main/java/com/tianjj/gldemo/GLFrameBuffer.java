@@ -1,12 +1,7 @@
 package com.tianjj.gldemo;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.opengl.GLES20;
-import android.opengl.GLUtils;
 import android.util.Log;
 
-import static android.opengl.GLES10.GL_RGBA;
 import static android.opengl.GLES20.*;
 
 public class GLFrameBuffer {
@@ -14,7 +9,6 @@ public class GLFrameBuffer {
     private final int mTextureName;
     private int mWidth;
     private int mHeight;
-//    private final int mRenderBuffer;
 
     public GLFrameBuffer() {
         int[] tmp = new int[1];
@@ -25,8 +19,6 @@ public class GLFrameBuffer {
         tmp = new int[1];
         glGenTextures(1, tmp, 0);
         mTextureName = tmp[0];
-//        glGenRenderbuffers(1, tmp, 2);
-//        mRenderBuffer = tmp[2];
     }
 
     public int getWidth () {
@@ -42,18 +34,33 @@ public class GLFrameBuffer {
         mHeight = height;
 
         bind();
+        checkGlError();
 
         glBindTexture(GL_TEXTURE_2D, mTextureName);
         checkGlError();
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        checkGlError();
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        checkGlError();
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        checkGlError();
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
+        checkGlError();
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
+        checkGlError();
+
+//        int[] rb = new int[1];
+//        glGenRenderbuffers(1, rb, 0);
+//        glBindRenderbuffer(GL_RENDERBUFFER, rb[0]);
+//        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA4, width, height);
+
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mTextureName, 0);
+        //glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rb[0]);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
 
         unbind();
+        checkGlError();
     }
 
     private void checkGlError() {
@@ -75,6 +82,10 @@ public class GLFrameBuffer {
 
     public void bind() {
         glBindFramebuffer(GL_FRAMEBUFFER, mFBOName);
+        int bindSt = getStatus();
+        if (bindSt != GL_FRAMEBUFFER_COMPLETE) {
+            Log.e("bind", "bind: failed," + bindSt, new Throwable());
+        }
     }
 
     public void unbind() {

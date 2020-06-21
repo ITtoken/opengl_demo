@@ -73,8 +73,6 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     }
 
     private void init(Context context) {
-        mBlurFilter = new BlurFilter(context);
-
         mGestureDetector = new GestureDetector(context, new MyGestureListener(this));
 
         setEGLContextClientVersion(2);
@@ -132,25 +130,28 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
                 ratio,
                 -1,
                 1,
-                1, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
+                2, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
                 6);
     }
 
     @Override
     public void onDrawFrame(GL10 gl) {
-        Log.d(TAG, "onDrawFrame: ..." + getWidth() + " x " + getHeight());
+        //Log.d(TAG, "onDrawFrame: ..." + getWidth() + " x " + getHeight());
         glViewport(0, 0, getWidth(), getHeight());
         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
         glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
 
-        mBlurFilter.init();
+        if (mBlurFilter == null) {
+            mBlurFilter = new BlurFilter(getContext());
+            mBlurFilter.init();
+        }
 
         if (mMesh == null) {
-            mMesh = createMesh(0, 1, 1, 0);
+            mMesh = createMesh(-1, 1, 1, -1);
         }
 
         if (-1 == mTex) {
-            mTex = getTextTextureWith("田佳佳", 800f);
+            mTex = getTextTextureWith("Tianjj@tcl.com", 800f);
         }
 
         if (-1 == mProgram) {
@@ -161,25 +162,35 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
 
         checkGlError();
 
-        glBindTexture(GL_TEXTURE_2D, mTex);
-
         prepareMesh();
 
-        mBlurFilter.setAsDrawTarget(5, getWidth(), getHeight());
+        mBlurFilter.setAsDrawTarget( 200, getWidth(), getHeight());
+        glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glBindTexture(GL_TEXTURE_2D, mTex);
+
+        int[] get = new int[1];
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, get, 0);
+
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, get, 0);
         glDrawArrays(GL_TRIANGLE_STRIP ,0, 4);
         mBlurFilter.preprare();
-        int renderTexture = mBlurFilter.getRenderTexture();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        prepareMesh();
+        int renderTexture = mBlurFilter.getRenderTexture();
         glBindTexture(GL_TEXTURE_2D, renderTexture);
 
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, get, 0);
+//
+        prepareMesh();
         glDrawArrays(GL_TRIANGLE_STRIP,0, 4);
 
         glDisableVertexAttribArray(attribPosition);
         glDisableVertexAttribArray(attribTexCoords);
         glBindTexture(GL_TEXTURE_2D,0);
+        glDeleteTextures(1, new int[]{renderTexture}, 0);
     }
 
     private void prepareMesh() {
@@ -192,7 +203,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         glEnableVertexAttribArray(attribTexCoords);
         glUniform1i(uniformTexture, 0);
 
-        if (toLeft) {
+        /*if (toLeft) {
             mX -= 0.05f;
             if (mX < -1) {
                 toLeft = false;
@@ -202,7 +213,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
             if (mX >= 0) {
                 toLeft = true;
             }
-        }
+        }*/
 
         Matrix.setRotateM(mMMatrix, 0, 0, 0, 1.0f, 0);
         Matrix.translateM(mMMatrix, 0, mX, -0.5f, 0);

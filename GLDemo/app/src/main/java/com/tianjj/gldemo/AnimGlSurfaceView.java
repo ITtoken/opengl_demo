@@ -139,7 +139,12 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     @Override
     public void onDrawFrame(GL10 gl) {
         //Log.d(TAG, "onDrawFrame: ..." + getWidth() + " x " + getHeight());
-        glViewport(0, 0, getWidth(), getHeight());
+        /**
+         * 设置绘制绘制视角范围, 片段着色器在处理的时候会根据glViewport设置的范围来确定处理哪些像素
+         * (所以在可以的时候,适当缩小glViewPort的范围可以进行优化)
+         * 单位是像素, 左下角为(0,0)点, x向右递增, y向上递增.
+         */
+        glViewport(100, 100, getWidth(), getHeight());
         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
         glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
 
@@ -153,6 +158,10 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         }
 
         if (mMesh == null) {
+            /**
+             * opengl的坐标中心为(0,0)点,左下角(-1, -1),右下角(1, -1), 右上角(1, 1), 左上角(-1, 1).
+             * 所以参数+1/-1代表坐标向右/向左移动半个屏幕单位.
+             **/
             mMesh = createMesh(-1, 1, 1, -1);
         }
 
@@ -178,6 +187,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
             }
         }
 
+
         mBlurFilter.setAsDrawTarget(mBlurRadius, getWidth(), getHeight());
 
         glBindTexture(GL_TEXTURE_2D, mTex);
@@ -195,7 +205,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         glDisableVertexAttribArray(attribPosition);
         glDisableVertexAttribArray(attribTexCoords);
         glBindTexture(GL_TEXTURE_2D,0);
-        glDeleteTextures(1, new int[]{renderTexture}, 0);
+        //glDeleteTextures(1, new int[]{renderTexture}, 0);
     }
 
     private void prepareMesh() {
@@ -385,7 +395,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         }
     }
 
-    private FloatBuffer createMesh(int left, int top, float right, float bottom) {
+    private FloatBuffer createMesh(float left, float top, float right, float bottom) {
         final float[] verticesData = {
                 // X, Y, Z, U, V
                 left, bottom, 0.0f, 0.0f, 1.0f,

@@ -154,7 +154,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         }
 
         if (-1 == mTex) {
-            mTex = getImageTexture();//getTextTextureWith("Tianjj@tcl.com", 800f);
+            mTex = getImageTexture();//getTextTextureWith("TianJJ GL Test", 800f);
         }
 
         if (mMesh == null) {

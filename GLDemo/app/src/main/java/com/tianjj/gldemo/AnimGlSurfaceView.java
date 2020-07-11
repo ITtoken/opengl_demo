@@ -114,6 +114,19 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         Matrix.orthoM(mProjectModel, 0, -ratio, ratio, -1, 1, 2, 10);
 
         /**
+         * perspectiveM 和 frustumM 一样， 都是设置正交投影， 用来替代perspectiveM的一些缺陷
+         *
+         * 参数：
+         * 1. 需要变换投影矩阵
+         * 2. 矩阵偏移
+         * 3. y轴防线上的视角
+         * 4. 宽高比
+         * 5. near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
+         *
+         */
+        Matrix.perspectiveM(mProjectModel, 0, 45.0f, ratio, 2.5f, 10);
+
+        /**
          * near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
          * ***注意： 相机的正视方向为Z轴负方向。
          *
@@ -126,14 +139,32 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
          * 上述对于正交投影同样是必须的， 只是正交投影在视觉上near变化的话，不会有什么变化。
          * 在透视投影下，near距离图象左边越近，图象胡看起来越大, far只是规定了图像最远能看到的距离，图象位置不变的情况下， far再增大也不会改变图象视觉上的大小。
          */
-        Matrix.frustumM(mProjectModel,
-                0,
-                -ratio,
-                ratio,
-                -1,
-                1,
-                1.5f, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
-                6);
+//        Matrix.frustumM(mProjectModel,
+//                0,
+//                -ratio,
+//                ratio,
+//                -1,
+//                1,
+//                1.5f, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
+//                6);
+    }
+
+    private void save() {
+         float[] tmpMtrix = new float[MATRIX_SIZE];
+
+         Matrix.setIdentityM(tmpMtrix, 0);
+        /**
+         * 这里需要想Z轴正方向(垂直屏幕向外)移动4~6个距离才能看见， 因为
+         * 矩阵设置成单位矩阵后， 没有了M V P效果， 所以屏幕显示的区域范围都变成了-1~1，
+         * 但是mesh的设置是Z轴为-5， 所以需要将Z轴转换到-1~1的范围内绘制结果才能显示出来
+         * */
+        Matrix.translateM(tmpMtrix, 0, 0, 0, 4);
+         Matrix.rotateM(tmpMtrix, 0, 180, 0, 0, 1);
+        glUniformMatrix4fv(uniformProjection, 1, false, tmpMtrix, 0);
+    }
+
+    private void restore() {
+        glUniformMatrix4fv(uniformProjection, 1, false, mMVPProject, 0);
     }
 
     @Override
@@ -144,7 +175,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
          * (所以在可以的时候,适当缩小glViewPort的范围可以进行优化)
          * 单位是像素, 左下角为(0,0)点, x向右递增, y向上递增.
          */
-        glViewport(100, 100, getWidth(), getHeight());
+        glViewport(0, 0, getWidth(), getHeight());
         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
         glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
 
@@ -190,8 +221,11 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
 
         mBlurFilter.setAsDrawTarget(mBlurRadius, getWidth(), getHeight());
 
+        save();
         glBindTexture(GL_TEXTURE_2D, mTex);
         glDrawArrays(GL_TRIANGLE_STRIP ,0, 4);
+        restore();
+
         mBlurFilter.preprare();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -199,13 +233,13 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         int renderTexture = mBlurFilter.getRenderTexture();
         glBindTexture(GL_TEXTURE_2D, renderTexture);
 
-        //prepareMesh();
+        prepareMesh();
         glDrawArrays(GL_TRIANGLE_STRIP,0, 4);
 
         glDisableVertexAttribArray(attribPosition);
         glDisableVertexAttribArray(attribTexCoords);
         glBindTexture(GL_TEXTURE_2D,0);
-        //glDeleteTextures(1, new int[]{renderTexture}, 0);
+        glDeleteTextures(1, new int[]{renderTexture}, 0);
     }
 
     private void prepareMesh() {
@@ -218,7 +252,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         glEnableVertexAttribArray(attribTexCoords);
         glUniform1i(uniformTexture, 0);
 
-/*        if (toLeft) {
+        /*if (toLeft) {
             mX -= 0.05f;
             if (mX < -1) {
                 toLeft = false;
@@ -398,10 +432,10 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     private FloatBuffer createMesh(float left, float top, float right, float bottom) {
         final float[] verticesData = {
                 // X, Y, Z, U, V
-                left, bottom, 0.0f, 0.0f, 1.0f,
-                right, bottom, 0.0f, 1.0f, 1.0f,
-                left, top, 0.0f, 0.0f, 0.0f,
-                right, top, 0.0f, 1.0f, 0.0f,
+                left, bottom, -5.0f, 0.0f, 1.0f,
+                right, bottom, -5.0f, 1.0f, 1.0f,
+                left, top, -5.0f, 0.0f, 0.0f,
+                right, top, -5.0f, 1.0f, 0.0f,
         };
 
         final int bytes = verticesData.length * FLOAT_SIZE_BYTES;

@@ -11,6 +11,8 @@ import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.opengl.GLES20;
+import android.opengl.GLES30;
+import android.opengl.GLES32;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLUtils;
 import android.opengl.Matrix;
@@ -111,7 +113,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     public void onSurfaceChanged(GL10 gl, int width, int height) {
         float ratio = (float) width / height;
         Matrix.setLookAtM(mViewModel, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0);
-        Matrix.orthoM(mProjectModel, 0, -ratio, ratio, -1, 1, 2, 10);
+        //Matrix.orthoM(mProjectModel, 0, -ratio, ratio, -1, 1, 2, 10);
 
         /**
          * perspectiveM 和 frustumM 一样， 都是设置正交投影， 用来替代perspectiveM的一些缺陷
@@ -124,7 +126,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
          * 5. near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
          *
          */
-        Matrix.perspectiveM(mProjectModel, 0, 45.0f, ratio, 2.5f, 10);
+        Matrix.perspectiveM(mProjectModel, 0, 45.0f, ratio, 0.1f, 100);
 
         /**
          * near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
@@ -205,6 +207,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         checkGlError();
 
         prepareMesh();
+
 
         if (toBlur) {
             mBlurRadius += 5;
@@ -354,6 +357,13 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         glBindTexture(GL_TEXTURE_2D, texture);
         checkGlError();
 
+        /**
+         * GL_TEXTURE_MIN_FILTER 和 GL_TEXTURE_MAG_FILTER分别指定了当纹理缩小（纹理内容比顶点坐标区域大， 会缩放纹理）
+         * 和纹理放大（纹理内容比顶点坐标区域小， 会拉伸纹理）的内容处理方式
+         *
+         * GL_TEXTURE_WRAP_S 和 GL_TEXTURE_WRAP_T
+         * 分表指定了，当纹理坐标大于纹理本身内容(大于1)的时候， S 和 T坐标方向（相当于X 和 Y轴）上多出来的区域怎么填充
+         */
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -430,12 +440,24 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     }
 
     private FloatBuffer createMesh(float left, float top, float right, float bottom) {
+        /**
+         * openGl的顶点坐标： 以中心点为原点， x轴范围是-1~1， y轴范围是-1 ~ 1.
+         * 纹理坐标： 左下角为原点， UV（对应xy， 或者是st， 都是同一个概念）范围是0~1，和定点左边位置匹配即可。
+         * 但是注意： 纹理坐标以左下角为原点，画出来的图像是反的， 这个时候可以以左上角为远点， x轴向右正方向， y轴向下正方向即可。
+         *
+         * **重要： 纹理坐标是指纹理（texture上的）坐标， 本身坐标就是处于纹理上的， 纹理坐标指定的要截取的文理上指定方向比例的内容，
+         * 贴图会根据纹理坐标来获取指定坐标范围内的内容贴到顶点坐标指定的定点内， 所以当纹理坐标的UV都小于1的时候， 会截取到部分图像，
+         * 当等于1时， 说明要获取的是纹理的全部内容。 但是，当大于1时， 会根据设置的纹理属性：
+         * GL_TEXTURE_WRAP_S
+         * GL_TEXTURE_WRAP_T
+         * 对纹理进行处理， 大于1说明纹理之外的多余内容也被包含了进来，这个时候根据设置的处理方式不同， 会有不同的效果。
+         */
         final float[] verticesData = {
                 // X, Y, Z, U, V
-                left, bottom, -5.0f, 0.0f, 1.0f,
-                right, bottom, -5.0f, 1.0f, 1.0f,
-                left, top, -5.0f, 0.0f, 0.0f,
-                right, top, -5.0f, 1.0f, 0.0f,
+                left, bottom, -5.0f, -0.5f, 1.5f,
+                right, bottom, -5.0f,   1.5f, 1.5f,
+                left, top, -5.0f,     -0.5f, -0.5f,
+                right, top, -5.0f, 1.5f, -0.5f,
         };
 
         final int bytes = verticesData.length * FLOAT_SIZE_BYTES;

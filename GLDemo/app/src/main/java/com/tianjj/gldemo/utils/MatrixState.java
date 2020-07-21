@@ -1,4 +1,4 @@
-package com.tianjj.gldemo;
+package com.tianjj.gldemo.utils;
 
 import android.opengl.Matrix;
 

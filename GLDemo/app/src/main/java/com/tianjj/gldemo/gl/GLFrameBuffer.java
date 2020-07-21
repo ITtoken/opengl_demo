@@ -1,4 +1,4 @@
-package com.tianjj.gldemo;
+package com.tianjj.gldemo.gl;
 
 import android.util.Log;
 
@@ -66,11 +66,11 @@ public class GLFrameBuffer {
         }
     }
 
-    int getStatus() {
+    public int getStatus() {
         return glCheckFramebufferStatus(GL_FRAMEBUFFER);
     }
 
-    int getTextureName() {
+    public int getTextureName() {
         return mTextureName;
     }
 

@@ -1,4 +1,4 @@
-package com.tianjj.gldemo;
+package com.tianjj.gldemo._2d;
 
 import android.content.Context;
 import android.content.res.AssetManager;
@@ -8,11 +8,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.Typeface;
-import android.graphics.drawable.Drawable;
 import android.opengl.GLES20;
-import android.opengl.GLES30;
-import android.opengl.GLES32;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLUtils;
 import android.opengl.Matrix;
@@ -20,7 +16,8 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
-import android.view.animation.PathInterpolator;
+
+import com.tianjj.gldemo.R;
 
 import java.io.IOException;
 import java.io.InputStream;

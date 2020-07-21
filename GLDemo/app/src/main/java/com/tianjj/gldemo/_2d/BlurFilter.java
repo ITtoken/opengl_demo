@@ -1,8 +1,10 @@
-package com.tianjj.gldemo;
+package com.tianjj.gldemo._2d;
 
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.util.Log;
+
+import com.tianjj.gldemo.gl.GLFrameBuffer;
 
 import java.io.IOException;
 import java.io.InputStream;

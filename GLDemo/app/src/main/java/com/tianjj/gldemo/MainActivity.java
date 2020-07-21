@@ -1,34 +1,38 @@
 package com.tianjj.gldemo;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.snackbar.Snackbar;
+import com.tianjj.gldemo._2d.AnimGlSurfaceView;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 
-import android.view.View;
-import android.view.Menu;
-import android.view.MenuItem;
-
-public class MainActivity extends AppCompatActivity {
-
-    private AnimGlSurfaceView mGLView;
+public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+    private Button mGlBaseBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mGLView = (AnimGlSurfaceView)findViewById(R.id.gl_view);
-        mGLView.onCreate();
+        mGlBaseBtn = findViewById(R.id.gl_base);
+        mGlBaseBtn.setOnClickListener(this);
     }
 
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        mGLView.onDestroy();
+    }
+
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.gl_base:
+                startActivity(new Intent(this, GLBaseActivity.class));
+                break;
+        }
     }
 }

@@ -16,19 +16,24 @@ public class MatrixState {
 
 	/**
 	 * 设置摄像机的参数
-	 * 
+	 *
+	 * 摄像机本身处于的位置坐标：
 	 * @param cx
 	 *            摄像机位置的 x 坐标
 	 * @param cy
 	 *            摄像机位置的 y 坐标
 	 * @param cz
 	 *            摄像机位置的 z 坐标
+	 *
+	 * 摄像机的朝向（看的方向）坐标：
 	 * @param tx
 	 *            摄像机朝向 x 坐标
 	 * @param ty
 	 *            摄像机朝向 y 坐标
 	 * @param tz
 	 *            摄像机朝向 z 坐标
+	 *
+	 * 摄像机向上的方向上的朝向坐标：
 	 * @param upx
 	 *            摄像机上方朝向 x 坐标
 	 * @param upy
@@ -81,6 +86,17 @@ public class MatrixState {
 	public static void setProjectOrtho(float left, float right, float bottom,
 			float top, float near, float far) {
 		Matrix.orthoM(mProjMatrix, 0, left, right, bottom, top, near, far);
+	}
+
+	/**
+	 *
+	 * @param fovy y轴方向上的视角角度(一般是45°)
+	 * @param aspect 宽高比
+	 * @param zNear near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
+	 * @param zFar near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
+	 */
+	public static void setProjectPerspective(float fovy, float aspect, float zNear, float zFar) {
+		Matrix.perspectiveM(mProjMatrix, 0, fovy, aspect, zNear, zFar);
 	}
 
 	/**

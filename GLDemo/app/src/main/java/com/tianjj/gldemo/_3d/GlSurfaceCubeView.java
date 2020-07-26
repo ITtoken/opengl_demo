@@ -30,6 +30,7 @@ import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
+import static android.opengl.GLES10.GL_BLEND;
 import static android.opengl.GLES10.GL_RGBA;
 import static android.opengl.GLES20.GL_CLAMP_TO_EDGE;
 import static android.opengl.GLES20.GL_COLOR_BUFFER_BIT;
@@ -37,10 +38,11 @@ import static android.opengl.GLES20.GL_COMPILE_STATUS;
 import static android.opengl.GLES20.GL_DEPTH_BUFFER_BIT;
 import static android.opengl.GLES20.GL_FLOAT;
 import static android.opengl.GLES20.GL_FRAGMENT_SHADER;
-import static android.opengl.GLES20.GL_FRAMEBUFFER;
 import static android.opengl.GLES20.GL_LINEAR;
 import static android.opengl.GLES20.GL_LINK_STATUS;
 import static android.opengl.GLES20.GL_NO_ERROR;
+import static android.opengl.GLES20.GL_ONE;
+import static android.opengl.GLES20.GL_SRC_ALPHA;
 import static android.opengl.GLES20.GL_TEXTURE0;
 import static android.opengl.GLES20.GL_TEXTURE_2D;
 import static android.opengl.GLES20.GL_TEXTURE_MAG_FILTER;
@@ -51,10 +53,11 @@ import static android.opengl.GLES20.GL_TRIANGLE_STRIP;
 import static android.opengl.GLES20.GL_TRUE;
 import static android.opengl.GLES20.GL_UNSIGNED_BYTE;
 import static android.opengl.GLES20.GL_VERTEX_SHADER;
+import static android.opengl.GLES20.GL_ZERO;
 import static android.opengl.GLES20.glActiveTexture;
 import static android.opengl.GLES20.glAttachShader;
-import static android.opengl.GLES20.glBindFramebuffer;
 import static android.opengl.GLES20.glBindTexture;
+import static android.opengl.GLES20.glBlendFunc;
 import static android.opengl.GLES20.glClear;
 import static android.opengl.GLES20.glClearColor;
 import static android.opengl.GLES20.glCompileShader;
@@ -63,8 +66,10 @@ import static android.opengl.GLES20.glCreateShader;
 import static android.opengl.GLES20.glDeleteProgram;
 import static android.opengl.GLES20.glDeleteShader;
 import static android.opengl.GLES20.glDeleteTextures;
+import static android.opengl.GLES20.glDisable;
 import static android.opengl.GLES20.glDisableVertexAttribArray;
 import static android.opengl.GLES20.glDrawArrays;
+import static android.opengl.GLES20.glEnable;
 import static android.opengl.GLES20.glEnableVertexAttribArray;
 import static android.opengl.GLES20.glGenTextures;
 import static android.opengl.GLES20.glGetAttribLocation;
@@ -85,7 +90,7 @@ import static android.opengl.GLES20.glViewport;
 
 public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Renderer {
     private static final int FLOAT_SIZE_BYTES = 4;
-    private static final String TAG = "AnimGlSurfaceView";
+    private static final String TAG = "GlSurfaceCubeView";
     private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 5 * FLOAT_SIZE_BYTES;
     private GestureDetector mGestureDetector;
     private WeakReference<Context> mContext;
@@ -111,6 +116,7 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
     private int uniformTexture;
     private int uniformProjection;
     private int mBlurRadius;
+    private int mTex0 = -1;
 
     public GlSurfaceCubeView(Context context) {
         super(context);
@@ -124,6 +130,8 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
 
     private void init(Context context) {
         mGestureDetector = new GestureDetector(context, new MyGestureListener(this));
+
+        Matrix.setIdentityM(mMMatrix, 0);
 
         setEGLContextClientVersion(2);
         setRenderer(this);
@@ -172,7 +180,7 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
          * 5. near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
          *
          */
-        Matrix.perspectiveM(mProjectModel, 0, 45.0f, ratio, 0.1f, 100);
+        Matrix.perspectiveM(mProjectModel, 0, 45.0f, ratio, 2f, 100);
 
         /**
          * near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
@@ -187,27 +195,27 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
          * 上述对于正交投影同样是必须的， 只是正交投影在视觉上near变化的话，不会有什么变化。
          * 在透视投影下，near距离图象左边越近，图象胡看起来越大, far只是规定了图像最远能看到的距离，图象位置不变的情况下， far再增大也不会改变图象视觉上的大小。
          */
-//        Matrix.frustumM(mProjectModel,
-//                0,
-//                -ratio,
-//                ratio,
-//                -1,
-//                1,
-//                1.5f, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
-//                6);
+/*        Matrix.frustumM(mProjectModel,
+                0,
+                -ratio,
+                ratio,
+                -1,
+                1,
+                1.5f, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
+                6);*/
     }
 
     private void save() {
-         float[] tmpMtrix = new float[MATRIX_SIZE];
+        float[] tmpMtrix = new float[MATRIX_SIZE];
 
-         Matrix.setIdentityM(tmpMtrix, 0);
+        Matrix.setIdentityM(tmpMtrix, 0);
         /**
          * 这里需要想Z轴正方向(垂直屏幕向外)移动4~6个距离才能看见， 因为
          * 矩阵设置成单位矩阵后， 没有了M V P效果， 所以屏幕显示的区域范围都变成了-1~1，
          * 但是mesh的设置是Z轴为-5， 所以需要将Z轴转换到-1~1的范围内绘制结果才能显示出来
          * */
         Matrix.translateM(tmpMtrix, 0, 0, 0, 4);
-         Matrix.rotateM(tmpMtrix, 0, 180, 0, 0, 1);
+        Matrix.rotateM(tmpMtrix, 0, 180, 0, 0, 1);
         glUniformMatrix4fv(uniformProjection, 1, false, tmpMtrix, 0);
     }
 
@@ -225,11 +233,10 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
          */
         glViewport(0, 0, getWidth(), getHeight());
         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-        glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
+        glClearColor(0.6f, 0.6f, 0.6f, 0.0f);
 
-        if (mBlurFilter == null) {
-            mBlurFilter = new BlurFilter(getContext());
-            mBlurFilter.init();
+        if (-1 == mTex0) {
+            mTex0 = getRoundRectTexture();
         }
 
         if (-1 == mTex) {
@@ -254,41 +261,50 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
 
         prepareMesh();
 
-
-        if (toBlur) {
-            mBlurRadius += 5;
-            if (mBlurRadius >= 500) {
-                toBlur = false;
-            }
-        } else {
-            mBlurRadius -= 5;
-            if (mBlurRadius <= 5) {
-                toBlur = true;
-            }
-        }
-
-
-        mBlurFilter.setAsDrawTarget(mBlurRadius, getWidth(), getHeight());
-
-        save();
         glBindTexture(GL_TEXTURE_2D, mTex);
-        glDrawArrays(GL_TRIANGLE_STRIP ,0, 4);
-        restore();
-
-        mBlurFilter.preprare();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        int renderTexture = mBlurFilter.getRenderTexture();
-        glBindTexture(GL_TEXTURE_2D, renderTexture);
-
-        prepareMesh();
-        glDrawArrays(GL_TRIANGLE_STRIP,0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         glDisableVertexAttribArray(attribPosition);
         glDisableVertexAttribArray(attribTexCoords);
-        glBindTexture(GL_TEXTURE_2D,0);
-        glDeleteTextures(1, new int[]{renderTexture}, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    private int getRoundRectTexture() {
+        int[] textures = new int[1];
+
+        glActiveTexture(GL_TEXTURE0);
+        glGenTextures(1, textures, 0);
+        checkGlError();
+
+        int texture = textures[0];
+        glBindTexture(GL_TEXTURE_2D, texture);
+        checkGlError();
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+
+        Paint paint = new Paint();
+        paint.setColor(Color.parseColor("#333333"));
+        paint.setAntiAlias(true);
+
+        Bitmap bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+
+        canvas.drawColor(Color.TRANSPARENT);
+
+        canvas.drawRoundRect(0, 0, 200, 200, 50 ,50, paint);
+
+
+        GLUtils.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap, GL_UNSIGNED_BYTE, 0);
+//        glGenerateMipmap(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+
+        return texture;
     }
 
     private void prepareMesh() {
@@ -301,21 +317,13 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
         glEnableVertexAttribArray(attribTexCoords);
         glUniform1i(uniformTexture, 0);
 
-        /*if (toLeft) {
-            mX -= 0.05f;
-            if (mX < -1) {
-                toLeft = false;
-            }
-        } else {
-            mX += 0.05f;
-            if (mX >= 0) {
-                toLeft = true;
-            }
-        }*/
+        mX += 0.5f;
+        if (mX > 360) {
+            mX = 0;
+        }
 
-        Matrix.setRotateM(mMMatrix, 0, 0, 0, 1.0f, 0);
-        Matrix.translateM(mMMatrix, 0, mX, 0, 0);
-        float[] finalMatrix = getFinalMatrix(mMMatrix);
+        float[] rotateM = rotateM(mMMatrix, mX);
+        float[] finalMatrix = getFinalMatrix(rotateM);
 
         glUniformMatrix4fv(uniformProjection, 1, false, finalMatrix, 0);
 
@@ -326,6 +334,38 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
         mMesh.position(3);
         glVertexAttribPointer(attribTexCoords, 2, GL_FLOAT, false,
                 TRIANGLE_VERTICES_DATA_STRIDE_BYTES, mMesh);
+    }
+
+    private float[] rotateM(float[] outMatrix, float angle) {
+        /**
+         * 注意需要先初始化为单位矩阵在操作， 否则会有问题
+         */
+        float[] T1 = new float[MATRIX_SIZE];
+        float[] T2 = new float[MATRIX_SIZE];
+        float[] R = new float[MATRIX_SIZE];
+        Matrix.setIdentityM(T1, 0);
+        Matrix.setIdentityM(T2, 0);
+        Matrix.setIdentityM(R, 0);
+
+        Matrix.translateM(T1, 0, 0, 0, 5);
+        Matrix.setRotateM(R, 0, angle, 1.0f, 0.5f, 0.5f);
+        Matrix.translateM(T2, 0, 0, 0, -5);
+
+        /**
+         * Opengl是列变换矩阵， 需要从右往左乘
+         *
+         * 先T1变换， 将图像移动到原点（之前Z在-5位置）
+         * 再进行R变换，旋转
+         * 最后T变换， 将图像移回到原来的位置（Z轴-5位置）
+         * T2 * R * T1 * modelMatrix
+         *
+         * 这样就是原地做旋转操作的效果
+         */
+        Matrix.setIdentityM(outMatrix, 0);
+        Matrix.multiplyMM(outMatrix, 0, T1, 0, outMatrix, 0);
+        Matrix.multiplyMM(outMatrix, 0, R, 0, outMatrix, 0);
+        Matrix.multiplyMM(outMatrix, 0, T2, 0, outMatrix, 0);
+        return outMatrix;
     }
 
     private String getShaderSource(String s) {
@@ -500,10 +540,10 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
          */
         final float[] verticesData = {
                 // X, Y, Z, U, V
-                left, bottom, -5.0f, -0.5f, 1.5f,
-                right, bottom, -5.0f,   1.5f, 1.5f,
-                left, top, -5.0f,     -0.5f, -0.5f,
-                right, top, -5.0f, 1.5f, -0.5f,
+                left, bottom, -5.0f, 0.0f, 1.0f,
+                right, bottom, -5.0f, 1.0f, 1.0f,
+                left, top, -5.0f, 0.0f, 0.0f,
+                right, top, -5.0f, 1.0f, 0.0f,
         };
 
         final int bytes = verticesData.length * FLOAT_SIZE_BYTES;

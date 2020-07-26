@@ -110,10 +110,6 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
     private int mTex = -1;
     private int mProgram = -1;
 
-    private boolean toLeft = true;
-    private boolean toBlur = true;
-
-    private BlurFilter mBlurFilter = null;
     private int attribPosition;
     private int attribTexCoords;
     private int uniformTexture;

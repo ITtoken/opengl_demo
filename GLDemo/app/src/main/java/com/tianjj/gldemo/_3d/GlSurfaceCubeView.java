@@ -36,12 +36,14 @@ import static android.opengl.GLES20.GL_CLAMP_TO_EDGE;
 import static android.opengl.GLES20.GL_COLOR_BUFFER_BIT;
 import static android.opengl.GLES20.GL_COMPILE_STATUS;
 import static android.opengl.GLES20.GL_DEPTH_BUFFER_BIT;
+import static android.opengl.GLES20.GL_DEPTH_TEST;
 import static android.opengl.GLES20.GL_FLOAT;
 import static android.opengl.GLES20.GL_FRAGMENT_SHADER;
 import static android.opengl.GLES20.GL_LINEAR;
 import static android.opengl.GLES20.GL_LINK_STATUS;
 import static android.opengl.GLES20.GL_NO_ERROR;
 import static android.opengl.GLES20.GL_ONE;
+import static android.opengl.GLES20.GL_REPEAT;
 import static android.opengl.GLES20.GL_SRC_ALPHA;
 import static android.opengl.GLES20.GL_TEXTURE0;
 import static android.opengl.GLES20.GL_TEXTURE_2D;
@@ -49,6 +51,7 @@ import static android.opengl.GLES20.GL_TEXTURE_MAG_FILTER;
 import static android.opengl.GLES20.GL_TEXTURE_MIN_FILTER;
 import static android.opengl.GLES20.GL_TEXTURE_WRAP_S;
 import static android.opengl.GLES20.GL_TEXTURE_WRAP_T;
+import static android.opengl.GLES20.GL_TRIANGLES;
 import static android.opengl.GLES20.GL_TRIANGLE_STRIP;
 import static android.opengl.GLES20.GL_TRUE;
 import static android.opengl.GLES20.GL_UNSIGNED_BYTE;
@@ -167,7 +170,7 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
     public void onSurfaceChanged(GL10 gl, int width, int height) {
         float ratio = (float) width / height;
         Matrix.setLookAtM(mViewModel, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0);
-        //Matrix.orthoM(mProjectModel, 0, -ratio, ratio, -1, 1, 2, 10);
+        //Matrix.orthoM(mProjectModel, 0, -ratio, ratio, -1, 1, 1, 10);
 
         /**
          * perspectiveM 和 frustumM 一样， 都是设置正交投影， 用来替代perspectiveM的一些缺陷
@@ -201,8 +204,8 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
                 ratio,
                 -1,
                 1,
-                1.5f, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
-                6);*/
+                2f, //near 和 far， 是指距离视点的距离，在ortho正交投影下，因为正交投影的特性，视觉上不会有什么变化, 在透视投影下，
+                100);*/
     }
 
     private void save() {
@@ -248,12 +251,12 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
              * opengl的坐标中心为(0,0)点,左下角(-1, -1),右下角(1, -1), 右上角(1, 1), 左上角(-1, 1).
              * 所以参数+1/-1代表坐标向右/向左移动半个屏幕单位.
              **/
-            mMesh = createMesh(-1, 1, 1, -1);
+            mMesh = createMesh();
         }
 
         if (-1 == mProgram) {
-            String vertShader = getShaderSource("vert.glsl");
-            String fragShader = getShaderSource("frag.glsl");
+            String vertShader = getShaderSource("cube_vert.glsl");
+            String fragShader = getShaderSource("cube_frag.glsl");
             mProgram = buildProgram(vertShader, fragShader);
         }
 
@@ -261,8 +264,12 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
 
         prepareMesh();
 
+        glEnable(GL_DEPTH_TEST);
+
         glBindTexture(GL_TEXTURE_2D, mTex);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        glDisable(GL_DEPTH_TEST);
 
         glDisableVertexAttribArray(attribPosition);
         glDisableVertexAttribArray(attribTexCoords);
@@ -347,9 +354,9 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
         Matrix.setIdentityM(T2, 0);
         Matrix.setIdentityM(R, 0);
 
-        Matrix.translateM(T1, 0, 0, 0, 5);
+        //Matrix.translateM(T1, 0, 0, 0, 5);
         Matrix.setRotateM(R, 0, angle, 1.0f, 0.5f, 0.5f);
-        Matrix.translateM(T2, 0, 0, 0, -5);
+        Matrix.translateM(T2, 0, 0, 0, -3);
 
         /**
          * Opengl是列变换矩阵， 需要从右往左乘
@@ -474,8 +481,8 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 
         Paint paint = new Paint();
@@ -525,31 +532,55 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
         }
     }
 
-    private FloatBuffer createMesh(float left, float top, float right, float bottom) {
-        /**
-         * openGl的顶点坐标： 以中心点为原点， x轴范围是-1~1， y轴范围是-1 ~ 1.
-         * 纹理坐标： 左下角为原点， UV（对应xy， 或者是st， 都是同一个概念）范围是0~1，和定点左边位置匹配即可。
-         * 但是注意： 纹理坐标以左下角为原点，画出来的图像是反的， 这个时候可以以左上角为远点， x轴向右正方向， y轴向下正方向即可。
-         *
-         * **重要： 纹理坐标是指纹理（texture上的）坐标， 本身坐标就是处于纹理上的， 纹理坐标指定的要截取的文理上指定方向比例的内容，
-         * 贴图会根据纹理坐标来获取指定坐标范围内的内容贴到顶点坐标指定的定点内， 所以当纹理坐标的UV都小于1的时候， 会截取到部分图像，
-         * 当等于1时， 说明要获取的是纹理的全部内容。 但是，当大于1时， 会根据设置的纹理属性：
-         * GL_TEXTURE_WRAP_S
-         * GL_TEXTURE_WRAP_T
-         * 对纹理进行处理， 大于1说明纹理之外的多余内容也被包含了进来，这个时候根据设置的处理方式不同， 会有不同的效果。
-         */
-        final float[] verticesData = {
-                // X, Y, Z, U, V
-                left, bottom, -5.0f, 0.0f, 1.0f,
-                right, bottom, -5.0f, 1.0f, 1.0f,
-                left, top, -5.0f, 0.0f, 0.0f,
-                right, top, -5.0f, 1.0f, 0.0f,
+    private FloatBuffer createMesh() {
+        final float[] vertices = {
+                -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+                0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+                0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+                0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+                -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+                -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+
+                -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+                0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+                0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+                0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+                -0.5f, 0.5f, 0.5f, 0.0f, 1.0f,
+                -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+
+                -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+                -0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+                -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+                -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+                -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+                -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+
+                0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+                0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+                0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+                0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+                0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+                0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+
+                -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+                0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
+                0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+                0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+                -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+                -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+
+                -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+                0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+                0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+                0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+                -0.5f, 0.5f, 0.5f, 0.0f, 0.0f,
+                -0.5f, 0.5f, -0.5f, 0.0f, 1.0f
         };
 
-        final int bytes = verticesData.length * FLOAT_SIZE_BYTES;
+        final int bytes = vertices.length * FLOAT_SIZE_BYTES;
         final FloatBuffer triangleVertices = ByteBuffer.allocateDirect(bytes).order(
                 ByteOrder.nativeOrder()).asFloatBuffer();
-        triangleVertices.put(verticesData).position(0);
+        triangleVertices.put(vertices).position(0);
         return triangleVertices;
     }
 

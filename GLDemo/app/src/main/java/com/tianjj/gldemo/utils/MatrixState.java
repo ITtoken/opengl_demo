@@ -10,6 +10,7 @@ import android.opengl.Matrix;
  */
 public class MatrixState {
 
+	private static final int MATRIX_SIZE = 16;
 	private static float[] mProjMatrix = new float[16]; // 4x4矩阵 投影用
 	private static float[] mVMatrix = new float[16]; // 摄像机位置朝向9参数矩阵
 	private static float[] mMVPMatrix; // 最后起作用的总变换矩阵
@@ -110,5 +111,24 @@ public class MatrixState {
 		Matrix.multiplyMM(mMVPMatrix, 0, mVMatrix, 0, spec, 0);
 		Matrix.multiplyMM(mMVPMatrix, 0, mProjMatrix, 0, mMVPMatrix, 0);
 		return mMVPMatrix;
+	}
+
+	public static void rotate(float[] outMatrix, float angle, float x, float y, float z) {
+		float[] tmp = getIdentityM();
+		Matrix.setRotateM(tmp, 0, angle, x, y, z);
+		Matrix.multiplyMM(outMatrix, 0, tmp, 0, outMatrix, 0);
+	}
+
+	public static void translate(float[] outMatrix, float x, float y, float z) {
+		float[] tmp = getIdentityM();
+		Matrix.translateM(tmp, 0, x, y, z);
+		Matrix.multiplyMM(outMatrix, 0, tmp, 0, outMatrix, 0);
+	}
+
+	private static float[] getIdentityM() {
+		float[] tmp = new float[MATRIX_SIZE];
+		Matrix.setIdentityM(tmp, 0);
+
+		return  tmp;
 	}
 }

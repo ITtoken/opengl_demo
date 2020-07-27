@@ -18,7 +18,7 @@ import android.view.GestureDetector;
 import android.view.MotionEvent;
 
 import com.tianjj.gldemo.R;
-import com.tianjj.gldemo._2d.BlurFilter;
+import com.tianjj.gldemo.utils.MatrixState;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,8 +30,8 @@ import java.nio.FloatBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
-import static android.opengl.GLES10.GL_BLEND;
 import static android.opengl.GLES10.GL_RGBA;
+import static android.opengl.GLES20.GL_BLEND;
 import static android.opengl.GLES20.GL_CLAMP_TO_EDGE;
 import static android.opengl.GLES20.GL_COLOR_BUFFER_BIT;
 import static android.opengl.GLES20.GL_COMPILE_STATUS;
@@ -42,7 +42,7 @@ import static android.opengl.GLES20.GL_FRAGMENT_SHADER;
 import static android.opengl.GLES20.GL_LINEAR;
 import static android.opengl.GLES20.GL_LINK_STATUS;
 import static android.opengl.GLES20.GL_NO_ERROR;
-import static android.opengl.GLES20.GL_ONE;
+import static android.opengl.GLES20.GL_ONE_MINUS_SRC_ALPHA;
 import static android.opengl.GLES20.GL_REPEAT;
 import static android.opengl.GLES20.GL_SRC_ALPHA;
 import static android.opengl.GLES20.GL_TEXTURE0;
@@ -52,11 +52,9 @@ import static android.opengl.GLES20.GL_TEXTURE_MIN_FILTER;
 import static android.opengl.GLES20.GL_TEXTURE_WRAP_S;
 import static android.opengl.GLES20.GL_TEXTURE_WRAP_T;
 import static android.opengl.GLES20.GL_TRIANGLES;
-import static android.opengl.GLES20.GL_TRIANGLE_STRIP;
 import static android.opengl.GLES20.GL_TRUE;
 import static android.opengl.GLES20.GL_UNSIGNED_BYTE;
 import static android.opengl.GLES20.GL_VERTEX_SHADER;
-import static android.opengl.GLES20.GL_ZERO;
 import static android.opengl.GLES20.glActiveTexture;
 import static android.opengl.GLES20.glAttachShader;
 import static android.opengl.GLES20.glBindTexture;
@@ -254,17 +252,30 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
             String vertShader = getShaderSource("cube_vert.glsl");
             String fragShader = getShaderSource("cube_frag.glsl");
             mProgram = buildProgram(vertShader, fragShader);
+
+            glUseProgram(mProgram);
+
+            attribPosition = glGetAttribLocation(mProgram, "position");
+            attribTexCoords = glGetAttribLocation(mProgram, "texCoords");
+            uniformTexture = glGetUniformLocation(mProgram, "texture");
+            uniformProjection = glGetUniformLocation(mProgram, "projection");
         }
 
         checkGlError();
 
-        prepareMesh();
-
+        prepareMesh(false);
         glEnable(GL_DEPTH_TEST);
-
         glBindTexture(GL_TEXTURE_2D, mTex);
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
+
+        prepareMesh(true);
+//        glEnable(GL_BLEND);
+//        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glBindTexture(GL_TEXTURE_2D, mTex0);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+//        glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
 
         glDisableVertexAttribArray(attribPosition);
@@ -310,12 +321,8 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
         return texture;
     }
 
-    private void prepareMesh() {
+    private void prepareMesh(boolean copy) {
         glUseProgram(mProgram);//绑定program到当前的opengl版本环境
-        attribPosition = glGetAttribLocation(mProgram, "position");
-        attribTexCoords = glGetAttribLocation(mProgram, "texCoords");
-        uniformTexture = glGetUniformLocation(mProgram, "texture");
-        uniformProjection = glGetUniformLocation(mProgram, "projection");
         glEnableVertexAttribArray(attribPosition);
         glEnableVertexAttribArray(attribTexCoords);
         glUniform1i(uniformTexture, 0);
@@ -326,6 +333,16 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
         }
 
         float[] rotateM = rotateM(mMMatrix, mX);
+
+        if (copy) {
+            /*float[] T3 = new float[MATRIX_SIZE];
+            Matrix.setIdentityM(T3, 0);
+            Matrix.translateM(T3, 0, 1, -1, -2);
+            Matrix.multiplyMM(rotateM, 0, T3, 0, rotateM, 0);*/
+
+            MatrixState.translate(rotateM, 1, -1, -2);
+        }
+
         float[] finalMatrix = getFinalMatrix(rotateM);
 
         glUniformMatrix4fv(uniformProjection, 1, false, finalMatrix, 0);
@@ -368,6 +385,13 @@ public class GlSurfaceCubeView extends GLSurfaceView implements GLSurfaceView.Re
         Matrix.multiplyMM(outMatrix, 0, T1, 0, outMatrix, 0);
         Matrix.multiplyMM(outMatrix, 0, R, 0, outMatrix, 0);
         Matrix.multiplyMM(outMatrix, 0, T2, 0, outMatrix, 0);
+        return outMatrix;
+    }
+
+    private float[] rotateM2(float[] outMatrix, float angle) {
+        MatrixState.rotate(outMatrix, angle, 1.0f, 0.5f, 0.5f);
+        MatrixState.translate(outMatrix, 0, 0, -3);
+
         return outMatrix;
     }
 

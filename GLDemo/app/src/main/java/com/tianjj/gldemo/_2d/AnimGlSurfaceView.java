@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.opengl.GLES20;
+import android.opengl.GLES32;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLUtils;
 import android.opengl.Matrix;
@@ -22,6 +23,7 @@ import com.tianjj.gldemo.R;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
@@ -46,7 +48,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     private static final float[] mProjectModel = new float[MATRIX_SIZE];
     private static float[] mMVPProject = null;
 
-    private static final float[] mMMatrix = new float[MATRIX_SIZE];
+    private static float[] mMMatrix = new float[MATRIX_SIZE];
     private float mX = 0f;
     private volatile boolean mbTranslate = true;
     private FloatBuffer mMesh = null;
@@ -62,6 +64,9 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     private int uniformTexture;
     private int uniformProjection;
     private int mBlurRadius;
+    private int mTex0 = -1;
+    private Bitmap mSubBitmap;
+    private Buffer mBuffer;
 
     public AnimGlSurfaceView(Context context) {
         super(context);
@@ -77,8 +82,10 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         mGestureDetector = new GestureDetector(context, new MyGestureListener(this));
 
         setEGLContextClientVersion(2);
+        //要是用模板测试， 必须要先设置模板缓冲区的大小（指的是单个像素），这里是8位， 否则不起作用（默认是0）
+        setEGLConfigChooser(8, 8, 8, 8, 24, 8);
         setRenderer(this);
-        setRenderMode(RENDERMODE_CONTINUOUSLY);
+        setRenderMode(RENDERMODE_WHEN_DIRTY);
     }
 
     @Override
@@ -89,7 +96,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         glClearColor(1, 1, 1, 1);
-        GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+        //GLES20.glEnable(GLES20.GL_DEPTH_TEST);
     }
 
     public static float[] getFinalMatrix(float[] spec) {
@@ -110,7 +117,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     public void onSurfaceChanged(GL10 gl, int width, int height) {
         float ratio = (float) width / height;
         Matrix.setLookAtM(mViewModel, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0);
-        //Matrix.orthoM(mProjectModel, 0, -ratio, ratio, -1, 1, 2, 10);
+        Matrix.orthoM(mProjectModel, 0, 0, width, 0, height, 0.1f, 10);
 
         /**
          * perspectiveM 和 frustumM 一样， 都是设置正交投影， 用来替代perspectiveM的一些缺陷
@@ -123,7 +130,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
          * 5. near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
          *
          */
-        Matrix.perspectiveM(mProjectModel, 0, 45.0f, ratio, 0.1f, 100);
+        //Matrix.perspectiveM(mProjectModel, 0, 45.0f, ratio, 0.1f, 100);
 
         /**
          * near 和 far， 是指距离视点的距离， 视点指的是相机的坐标为位置。
@@ -149,16 +156,16 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     }
 
     private void save() {
-         float[] tmpMtrix = new float[MATRIX_SIZE];
+        float[] tmpMtrix = new float[MATRIX_SIZE];
 
-         Matrix.setIdentityM(tmpMtrix, 0);
+        Matrix.setIdentityM(tmpMtrix, 0);
         /**
          * 这里需要想Z轴正方向(垂直屏幕向外)移动4~6个距离才能看见， 因为
          * 矩阵设置成单位矩阵后， 没有了M V P效果， 所以屏幕显示的区域范围都变成了-1~1，
          * 但是mesh的设置是Z轴为-5， 所以需要将Z轴转换到-1~1的范围内绘制结果才能显示出来
          * */
         Matrix.translateM(tmpMtrix, 0, 0, 0, 4);
-         Matrix.rotateM(tmpMtrix, 0, 180, 0, 0, 1);
+        Matrix.rotateM(tmpMtrix, 0, 180, 0, 0, 1);
         glUniformMatrix4fv(uniformProjection, 1, false, tmpMtrix, 0);
     }
 
@@ -175,12 +182,24 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
          * 单位是像素, 左下角为(0,0)点, x向右递增, y向上递增.
          */
         glViewport(0, 0, getWidth(), getHeight());
-        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+        //启用模板测试
+        glEnable(GL_STENCIL_TEST);
+        //初始模板测试
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        //设置掩码， 开放写入， 允许修改模板缓冲
+        glStencilMask(0xFF);
+
         glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
+        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         if (mBlurFilter == null) {
             mBlurFilter = new BlurFilter(getContext());
             mBlurFilter.init();
+        }
+
+        if (-1 == mTex0) {
+            mTex0 = getRoundRectTexture();
         }
 
         if (-1 == mTex) {
@@ -192,21 +211,28 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
              * opengl的坐标中心为(0,0)点,左下角(-1, -1),右下角(1, -1), 右上角(1, 1), 左上角(-1, 1).
              * 所以参数+1/-1代表坐标向右/向左移动半个屏幕单位.
              **/
-            mMesh = createMesh(-1, 1, 1, -1);
+            mMesh = createMesh(100, 1000, 1000, 100);
         }
 
         if (-1 == mProgram) {
             String vertShader = getShaderSource("vert.glsl");
             String fragShader = getShaderSource("frag.glsl");
             mProgram = buildProgram(vertShader, fragShader);
+
+            glUseProgram(mProgram);//绑定program到当前的opengl版本环境
+            attribPosition = glGetAttribLocation(mProgram, "position");
+            attribTexCoords = glGetAttribLocation(mProgram, "texCoords");
+            uniformTexture = glGetUniformLocation(mProgram, "texture");
+            uniformProjection = glGetUniformLocation(mProgram, "projection");
         }
 
         checkGlError();
 
-        prepareMesh();
+
+        prepareMesh(false);
 
 
-        if (toBlur) {
+        /*if (toBlur) {
             mBlurRadius += 5;
             if (mBlurRadius >= 500) {
                 toBlur = false;
@@ -219,11 +245,11 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         }
 
 
-        mBlurFilter.setAsDrawTarget(mBlurRadius, getWidth(), getHeight());
+        mBlurFilter.setAsDrawTarget(mBlurRadius, getWidth(), getHeight());*/
 
-        save();
+        /*save();
         glBindTexture(GL_TEXTURE_2D, mTex);
-        glDrawArrays(GL_TRIANGLE_STRIP ,0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         restore();
 
         mBlurFilter.preprare();
@@ -234,20 +260,98 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
         glBindTexture(GL_TEXTURE_2D, renderTexture);
 
         prepareMesh();
-        glDrawArrays(GL_TRIANGLE_STRIP,0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        */
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glBindTexture(GL_TEXTURE_2D, mTex0);
+        checkGlError();
+
+        //再绘制模板之前， 要先设置参数， 将接下来的绘制， 总是设置模板参考值成为1
+        //那么接下来绘制的内容，区域的模板缓冲区都会被设置为1
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glStencilMask(0XFF);//开放写入， 允许修改模板缓冲
+
+ /*       if (mSubBitmap == null) {
+            mSubBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ttt);
+//            mBuffer = ByteBuffer.allocateDirect(mSubBitmap.getWidth() * mSubBitmap.getHeight() * 4).asIntBuffer();
+//            mSubBitmap.copyPixelsToBuffer(mBuffer);
+        }
+//        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mSubBitmap.getWidth(), mSubBitmap.getHeight(), GLES20.GL_RGBA, GL_UNSIGNED_BYTE, mBuffer);
+        GLUtils.texSubImage2D(GL_TEXTURE_2D, 0, 5, 5, mSubBitmap, GL_RGBA, GL_UNSIGNED_BYTE);
+        checkGlError();*/
+
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glDisable(GL_BLEND);
+        //glDisable(GL_STENCIL_TEST);
+
+
+
+
+        prepareMesh(true);
+        //glEnable(GL_BLEND);
+        //glBlendFunc(GL_DST_ALPHA, GL_ZERO);
+
+        //绘制第二个物体， 需要参考模之前的板值， 这里设置为只要模板之等于1的区域， 则执行绘制， 否则不绘制
+        glStencilFunc(GL_EQUAL, 1, 0xff);
+        glStencilMask(0x00);//关闭写入， 不允许修改模板缓冲
+        glBindTexture(GL_TEXTURE_2D, mTex);
+        checkGlError();
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        checkGlError();
+        //glDisable(GL_BLEND);
+
+        //关闭模板测试
+        glDisable(GL_STENCIL_TEST);
+
 
         glDisableVertexAttribArray(attribPosition);
         glDisableVertexAttribArray(attribTexCoords);
-        glBindTexture(GL_TEXTURE_2D,0);
-        glDeleteTextures(1, new int[]{renderTexture}, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        //glDeleteTextures(1, new int[]{renderTexture}, 0);
     }
 
-    private void prepareMesh() {
+    private int getRoundRectTexture() {
+        int[] textures = new int[1];
+
+        glActiveTexture(GL_TEXTURE0);
+        glGenTextures(1, textures, 0);
+        checkGlError();
+
+        int texture = textures[0];
+        glBindTexture(GL_TEXTURE_2D, texture);
+        checkGlError();
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+
+        Paint paint = new Paint();
+        paint.setColor(Color.parseColor("#333333"));
+        paint.setAntiAlias(true);
+
+        Bitmap bitmap = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+
+        canvas.drawColor(Color.TRANSPARENT);
+
+        canvas.drawRoundRect(0, 0, 200, 200, 20, 20, paint);
+
+
+        GLUtils.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bitmap, GL_UNSIGNED_BYTE, 0);
+//        glGenerateMipmap(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+
+        return texture;
+    }
+
+    private void prepareMesh(boolean b) {
         glUseProgram(mProgram);//绑定program到当前的opengl版本环境
-        attribPosition = glGetAttribLocation(mProgram, "position");
-        attribTexCoords = glGetAttribLocation(mProgram, "texCoords");
-        uniformTexture = glGetUniformLocation(mProgram, "texture");
-        uniformProjection = glGetUniformLocation(mProgram, "projection");
         glEnableVertexAttribArray(attribPosition);
         glEnableVertexAttribArray(attribTexCoords);
         glUniform1i(uniformTexture, 0);
@@ -263,9 +367,12 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
                 toLeft = true;
             }
         }*/
-
+        ;
         Matrix.setRotateM(mMMatrix, 0, 0, 0, 1.0f, 0);
         Matrix.translateM(mMMatrix, 0, mX, 0, 0);
+        if (b) {
+            Matrix.translateM(mMMatrix, 0, 100f, 100f, 0f);
+        }
         float[] finalMatrix = getFinalMatrix(mMMatrix);
 
         glUniformMatrix4fv(uniformProjection, 1, false, finalMatrix, 0);
@@ -451,10 +558,10 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
          */
         final float[] verticesData = {
                 // X, Y, Z, U, V
-                left, bottom, -5.0f, -0.5f, 1.5f,
-                right, bottom, -5.0f,   1.5f, 1.5f,
-                left, top, -5.0f,     -0.5f, -0.5f,
-                right, top, -5.0f, 1.5f, -0.5f,
+                left, bottom, -0.0f, -0f, 1f,
+                right, bottom, -0.0f, 1f, 1f,
+                left, top, -0.0f, -0f, -0f,
+                right, top, -0.0f, 1f, -0f,
         };
 
         final int bytes = verticesData.length * FLOAT_SIZE_BYTES;

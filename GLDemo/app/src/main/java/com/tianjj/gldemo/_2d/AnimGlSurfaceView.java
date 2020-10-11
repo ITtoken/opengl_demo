@@ -117,6 +117,7 @@ public class AnimGlSurfaceView extends GLSurfaceView implements GLSurfaceView.Re
     public void onSurfaceChanged(GL10 gl, int width, int height) {
         float ratio = (float) width / height;
         Matrix.setLookAtM(mViewModel, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0);
+        //将OpenGL的（归一化）坐标系映射到指定宽高坐标， 这样就可以使用具体的坐标值了
         Matrix.orthoM(mProjectModel, 0, 0, width, 0, height, 0.1f, 10);
 
         /**
